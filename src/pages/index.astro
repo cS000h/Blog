@@ -1,0 +1,34 @@
+---
+import Base from '../layouts/Base.astro';
+import Stream from '../components/Stream.astro';
+import SectionTabs from '../components/SectionTabs.astro';
+import { SITE } from '../config';
+import { getAll } from '../lib/posts';
+
+const posts = await getAll();
+const counts: Record<string, number> = {};
+for (const p of posts) if (p.section) counts[p.section] = (counts[p.section] ?? 0) + 1;
+---
+
+<Base>
+  <section class="intro">
+    <p class="mono label">$ cat README</p>
+    <h1>{SITE.description}</h1>
+    <p class="mono">
+      {posts.filter((p) => p.kind === 'note').length} 条笔记 · {posts.filter((p) => p.kind === 'article').length} 篇文章
+    </p>
+  </section>
+  <SectionTabs counts={counts} total={posts.length} />
+  <Stream posts={posts} />
+</Base>
+
+<style>
+  .intro { margin: 1rem 0 2.2rem; }
+  .intro h1 {
+    font-family: var(--font-serif);
+    font-size: clamp(1.6rem, 5vw, 2.2rem);
+    line-height: 1.4;
+    margin: 0.3rem 0 0.6rem;
+  }
+  .intro p { margin: 0; }
+</style>

@@ -1,0 +1,21 @@
+---
+import Base from '../../layouts/Base.astro';
+import Stream from '../../components/Stream.astro';
+import { getNotes } from '../../lib/posts';
+const posts = await getNotes();
+---
+
+<Base title="笔记" description="短小的想法，随手记下。">
+  <header class="head">
+    <p class="mono label">笔记 · {posts.length}</p>
+    <h1>随手记下的</h1>
+    <p class="intro">一两句话也算。没整理好的想法先放在这里。</p>
+  </header>
+  <Stream posts={posts} />
+</Base>
+
+<style>
+  .head { margin: 1rem 0 2rem; }
+  .head h1 { font-family: var(--font-serif); font-size: 2rem; margin: 0.2rem 0 0.3rem; }
+  .intro { margin: 0; color: var(--muted); }
+</style>

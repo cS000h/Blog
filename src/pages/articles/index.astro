@@ -1,0 +1,47 @@
+---
+import Base from '../../layouts/Base.astro';
+import { fmtDate, getArticles, readingMinutes, sectionOf } from '../../lib/posts';
+const posts = await getArticles();
+---
+
+<Base title="文章" description="写得完整一点的记录。">
+  <header class="head">
+    <p class="mono label">文章 · {posts.length}</p>
+    <h1>想清楚之后写下的</h1>
+    <p class="intro">比笔记长一些，有头有尾的记录。</p>
+  </header>
+  {posts.length === 0 && <p class="mono">还没有文章。</p>}
+  <ol class="list">
+    {
+      posts.map((p) => (
+        <li>
+          <span class="mono date">{fmtDate(p.date)}</span>
+          <a href={p.href}>{p.title}</a>
+          <span class="mono right">
+            {sectionOf(p.section)?.name ?? ''} {readingMinutes(p.body)} 分钟
+          </span>
+        </li>
+      ))
+    }
+  </ol>
+</Base>
+
+<style>
+  .head { margin: 1rem 0 2rem; }
+  .head h1 { font-family: var(--font-serif); font-size: 2rem; margin: 0.2rem 0 0.3rem; }
+  .intro { margin: 0; color: var(--muted); }
+  .list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  .list li {
+    display: grid;
+    grid-template-columns: 6.5rem 1fr auto;
+    gap: 1rem;
+    align-items: baseline;
+    padding: 0.85rem 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .list a { font-family: var(--font-serif); font-weight: 700; text-decoration: none; }
+  .right { white-space: nowrap; }
+  @media (max-width: 560px) {
+    .list li { grid-template-columns: 1fr; gap: 0.1rem; }
+  }
+</style>

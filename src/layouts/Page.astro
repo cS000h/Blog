@@ -1,0 +1,16 @@
+---
+// 普通页面（比如“关于”）的布局，直接用 Markdown 写。
+import Base from './Base.astro';
+const { frontmatter } = Astro.props;
+---
+
+<Base title={frontmatter.title} description={frontmatter.description}>
+  <article>
+    <h1>{frontmatter.title}</h1>
+    <div class="prose"><slot /></div>
+  </article>
+</Base>
+
+<style>
+  h1 { font-family: var(--font-serif); font-size: 2rem; margin: 1rem 0 1.5rem; }
+</style>

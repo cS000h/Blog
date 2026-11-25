@@ -1,0 +1,51 @@
+---
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import { fmtDate, getNotes, sectionOf, url } from '../../lib/posts';
+
+export async function getStaticPaths() {
+  const posts = await getNotes();
+  return posts.map((post, i) => ({
+    params: { id: post.id },
+    props: { post, newer: posts[i - 1], older: posts[i + 1] },
+  }));
+}
+const { post, newer, older } = Astro.props;
+const { Content } = await render(post.entry);
+const sec = sectionOf(post.section);
+const excerpt = post.body.replace(/[#>*_`\[\]\n]/g, ' ').trim().slice(0, 80);
+---
+
+<Base title={post.title ?? `笔记 ${fmtDate(post.date)}`} description={excerpt}>
+  <article class="note">
+    <p class="mono meta">
+      <time datetime={post.date.toISOString()}>{fmtDate(post.date)}</time>
+      <span class="kind" data-kind="note">笔记</span>
+      {sec && <a href={url(`/sections/${sec.id}/`)}>#{sec.name}</a>}
+      {post.tags.map((t) => <span>· {t}</span>)}
+    </p>
+    {post.title && <h1>{post.title}</h1>}
+    <div class="prose"><Content /></div>
+  </article>
+
+  <nav class="pager mono" aria-label="上一条 / 下一条">
+    {newer ? <a href={newer.href}>← 较新</a> : <span />}
+    <a href={url('/notes/')}>全部笔记</a>
+    {older ? <a href={older.href}>较早 →</a> : <span />}
+  </nav>
+</Base>
+
+<style>
+  .note { margin-top: 1rem; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; margin: 0 0 1.2rem; }
+  .meta a { text-decoration: none; }
+  h1 { font-family: var(--font-serif); font-size: 1.7rem; line-height: 1.35; margin: 0 0 1rem; }
+  .pager {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 3.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+  }
+  .pager a { text-decoration: none; }
+</style>

@@ -1,0 +1,241 @@
+---
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import { fmtDate, getArticles, readingMinutes, sectionOf, url } from '../../lib/posts';
+
+export async function getStaticPaths() {
+  const posts = await getArticles();
+  return posts.map((post, i) => ({
+    params: { id: post.id },
+    props: { post, newer: posts[i - 1], older: posts[i + 1] },
+  }));
+}
+const { post, newer, older } = Astro.props;
+const { Content, headings } = await render(post.entry);
+const toc = headings.filter((h) => (h.depth === 2 || h.depth === 3) && h.slug !== 'footnote-label');
+// 树形目录的分支符号：同级最后一项用 └，其余用 ├；三级标题前面补上竖线
+const branch = (i: number) => {
+  const h = toc[i];
+  const isLast = (j: number, depth: number) => {
+    for (let k = j + 1; k < toc.length; k++) {
+      if (toc[k].depth < depth) return true;
+      if (toc[k].depth === depth) return false;
+    }
+    return true;
+  };
+  if (h.depth === 2) return isLast(i, 2) ? '└─ ' : '├─ ';
+  let parent = i;
+  while (parent > 0 && toc[parent].depth !== 2) parent--;
+  const stem = isLast(parent, 2) ? '   ' : '│  ';
+  return stem + (isLast(i, 3) ? '└─ ' : '├─ ');
+};
+const minutes = readingMinutes(post.body);
+const sec = sectionOf(post.section);
+---
+
+<Base title={post.title} description={post.description}>
+  <article id="top">
+    <header class="head">
+      <p class="kicker mono label">
+        文章{sec && <> / <a href={url(`/sections/${sec.id}/`)}>{sec.name}</a></>}
+      </p>
+      <h1>{post.title}</h1>
+      {post.description && <p class="dek">{post.description}</p>}
+
+      <dl class="meta mono">
+        <div><dt class="label">日期</dt><dd><time datetime={post.date.toISOString()}>{fmtDate(post.date)}</time></dd></div>
+        <div><dt class="label">栏目</dt><dd>{sec?.name ?? '—'}</dd></div>
+        <div><dt class="label">阅读</dt><dd>{minutes} 分钟</dd></div>
+        {post.tags.length > 0 && <div><dt class="label">标签</dt><dd>{post.tags.join(' · ')}</dd></div>}
+      </dl>
+
+    </header>
+
+    <div class="layout">
+      {
+        toc.length > 1 && (
+          <aside class="tree mono" aria-label="目录">
+            <div class="tree-inner">
+              <p class="label tree-title">目录</p>
+              <ul>
+                <li class="root"><a href="#top" data-root>.</a></li>
+                {toc.map((h, i) => (
+                  <li data-depth={h.depth}>
+                    <span class="branch" aria-hidden="true">{branch(i)}</span>
+                    <a href={`#${h.slug}`} data-target={h.slug}>{h.text}</a>
+                  </li>
+                ))}
+              </ul>
+              <div class="progress" aria-hidden="true">
+                <span class="bar" data-bar>░░░░░░░░░░░░░░░░</span>
+                <span data-pct>00%</span>
+              </div>
+              <p class="tree-foot">{minutes} 分钟阅读</p>
+            </div>
+          </aside>
+        )
+      }
+
+      <div class="mini mono" aria-hidden="true">
+        <span class="mini-sec" data-mini-sec>{post.title}</span>
+        <span class="mini-bar" data-mini-bar>░░░░░░░░ 00%</span>
+      </div>
+
+      <div class="prose" data-body>
+      <Content />
+    </div>
+    </div>
+  </article>
+
+  <nav class="pager mono" aria-label="上一篇 / 下一篇">
+    {newer ? <a href={newer.href}>← 较新：{newer.title}</a> : <span />}
+    {older ? <a href={older.href}>较早：{older.title} →</a> : <span />}
+  </nav>
+
+  <script>
+    // 动态目录：滚动时高亮当前所在的小节，读过的分支变色，并更新文字进度条
+    const bar = document.querySelector<HTMLElement>('[data-bar]');
+    const pct = document.querySelector<HTMLElement>('[data-pct]');
+    const body = document.querySelector<HTMLElement>('[data-body]');
+    const links = [...document.querySelectorAll<HTMLAnchorElement>('.tree a[data-target]')];
+    const targets = links.map((a) => document.getElementById(a.dataset.target!));
+    const miniSec = document.querySelector<HTMLElement>('[data-mini-sec]');
+    const miniBar = document.querySelector<HTMLElement>('[data-mini-bar]');
+    if (miniSec) miniSec.dataset.title = miniSec.textContent ?? '';
+    const N = 16;
+
+    function update() {
+      if (!body) return;
+      const r = body.getBoundingClientRect();
+      const total = r.height - window.innerHeight * 0.6;
+      const p = Math.min(1, Math.max(0, total > 0 ? -r.top / total : 1));
+      if (bar && pct) {
+        const filled = Math.round(p * N);
+        bar.textContent = '▓'.repeat(filled) + '░'.repeat(N - filled);
+        pct.textContent = p >= 1 ? '读完' : `${String(Math.round(p * 100)).padStart(2, '0')}%`;
+      }
+      // 当前小节 = 最后一个顶端已经越过屏幕 1/3 处的标题
+      let current = -1;
+      targets.forEach((t, i) => {
+        if (t && t.getBoundingClientRect().top < window.innerHeight / 3) current = i;
+      });
+      if (miniSec) miniSec.textContent = current >= 0 ? `§ ${links[current].textContent}` : miniSec.dataset.title!;
+      if (miniBar) {
+        const f = Math.round(p * 8);
+        miniBar.textContent = '▓'.repeat(f) + '░'.repeat(8 - f) + ` ${String(Math.round(p * 100)).padStart(2, '0')}%`;
+      }
+      links.forEach((a, i) => {
+        const li = a.parentElement!;
+        li.classList.toggle('is-active', i === current);
+        li.classList.toggle('is-read', i < current);
+      });
+    }
+    addEventListener('scroll', update, { passive: true });
+    addEventListener('resize', update);
+    update();
+  </script>
+</Base>
+
+<style>
+  .head { margin: 1rem 0 1.5rem; }
+  .kicker { margin: 0 0 0.6rem; color: var(--accent); }
+  .kicker a { text-decoration: none; }
+  h1 {
+    font-family: var(--font-serif);
+    font-size: clamp(1.8rem, 5.5vw, 2.5rem);
+    line-height: 1.3;
+    margin: 0 0 0.7rem;
+  }
+  .dek { font-size: 1.1rem; color: var(--muted); margin: 0 0 1.6rem; }
+
+  .meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 0.8rem;
+    margin: 0 0 1.6rem;
+    padding: 0.9rem 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .meta dt { font-size: 0.68rem; opacity: 0.8; }
+  .meta dd { margin: 0.1rem 0 0; color: var(--fg); }
+
+  /* ——— 动态目录树 ——— */
+  .layout { position: relative; }
+  .tree { margin: 0 0 2rem; }
+  .tree-inner {
+    background: var(--bg-soft);
+    border-radius: 6px;
+    padding: 0.9rem 1.1rem;
+  }
+  .tree-title { margin: 0 0 0.3rem; }
+  .tree ul { list-style: none; margin: 0; padding: 0; }
+  .tree li { display: flex; line-height: 1.95; white-space: nowrap; }
+  .tree .root a { color: var(--accent); }
+  .tree .branch { white-space: pre; color: var(--muted); opacity: 0.55; transition: color 0.2s, opacity 0.2s; }
+  .tree a {
+    color: var(--muted);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.2s;
+  }
+  .tree a:hover { color: var(--accent); }
+  .tree li.is-read .branch { color: var(--accent); opacity: 0.6; }
+  .tree li.is-read a { color: var(--fg); opacity: 0.6; }
+  .tree li.is-active .branch { color: var(--accent); opacity: 1; }
+  .tree li.is-active a { color: var(--fg); font-weight: 600; }
+  .tree li.is-active a::after { content: ' ◂'; color: var(--accent); font-weight: 400; }
+
+  .progress {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 0.7rem;
+    padding-top: 0.6rem;
+    border-top: 1px dashed var(--line);
+  }
+  .progress .bar { color: var(--accent); letter-spacing: -0.02em; }
+  .tree-foot { margin: 0.2rem 0 0; opacity: 0.7; }
+
+  /* 窄屏：完整目录放在正文前，另有一条吸顶的小进度条显示当前小节 */
+  .mini {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    margin-bottom: 1.5rem;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .mini-sec { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
+  .mini-bar { color: var(--accent); white-space: nowrap; }
+  @media (min-width: 1100px) {
+    .mini { display: none; }
+  }
+
+  /* 宽屏：目录放到正文左侧，跟着滚动 */
+  @media (min-width: 1100px) {
+    .tree {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: calc(100% + 2.5rem);
+      width: 15rem;
+      margin: 0;
+    }
+    .tree-inner { position: sticky; top: 2rem; background: none; padding: 0; }
+  }
+
+  .pager {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 4rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+  }
+  .pager a { text-decoration: none; }
+</style>

@@ -1,0 +1,100 @@
+---
+// 按月份分组的记录流：笔记直接显示全文，文章显示标题和摘要。
+import { render } from 'astro:content';
+import { fmtDate, readingMinutes, sectionOf, url, KIND_LABEL, type Post } from '../lib/posts';
+
+interface Props {
+  posts: Post[];
+  showSection?: boolean;
+}
+const { posts, showSection = true } = Astro.props;
+
+const groups = new Map<string, Post[]>();
+for (const p of posts) {
+  const key = fmtDate(p.date).slice(0, 7).replace('-', ' / ');
+  if (!groups.has(key)) groups.set(key, []);
+  groups.get(key)!.push(p);
+}
+const rendered = new Map(
+  await Promise.all(
+    posts.filter((p) => p.kind === 'note').map(async (p) => [p.href, (await render(p.entry)).Content] as const),
+  ),
+);
+---
+
+{posts.length === 0 && <p class="mono empty">这里还空着。</p>}
+
+{
+  [...groups].map(([month, items]) => (
+    <section class="month">
+      <h2 class="mono label month-head">{month}</h2>
+      <ol class="entries">
+        {items.map((p) => {
+          const Content = rendered.get(p.href);
+          const sec = sectionOf(p.section);
+          return (
+            <li class="entry" data-kind={p.kind}>
+              <div class="meta mono">
+                <a href={p.href} class="date">{fmtDate(p.date).slice(5)}</a>
+                <span class="kind" data-kind={p.kind}>{KIND_LABEL[p.kind]}</span>
+                {showSection && sec && (
+                  <a class="section" href={url(`/sections/${sec.id}/`)}>#{sec.name}</a>
+                )}
+              </div>
+              <div class="body">
+                {p.kind === 'article' ? (
+                  <>
+                    <a class="title" href={p.href}>{p.title}</a>
+                    {p.description && <p class="desc">{p.description}</p>}
+                    <span class="mono">{readingMinutes(p.body)} 分钟 →</span>
+                  </>
+                ) : (
+                  <>
+                    {p.title && <a class="note-title" href={p.href}>{p.title}</a>}
+                    <div class="prose note">{Content && <Content />}</div>
+                  </>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  ))
+}
+
+<style>
+  .month { margin-bottom: 2.2rem; }
+  .month-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0 0 0.4rem;
+    padding: 0.5rem 0;
+    background: var(--bg);
+    font-weight: 500;
+    border-bottom: 1px solid var(--line);
+  }
+  .entries { list-style: none; margin: 0; padding: 0; }
+  .entry {
+    display: grid;
+    grid-template-columns: 7.2rem 1fr;
+    gap: 0.2rem 1.2rem;
+    padding: 1.1rem 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .entry:last-child { border-bottom: 0; }
+  .meta { display: flex; flex-direction: column; align-items: flex-start; gap: 0.35rem; padding-top: 0.3rem; }
+  .meta .date { text-decoration: none; color: var(--fg); }
+  .meta .section { text-decoration: none; font-size: 0.72rem; }
+  .title { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 700; text-decoration: none; line-height: 1.5; }
+  .desc { margin: 0.3rem 0 0.4rem; color: var(--muted); font-size: 0.95rem; }
+  .note-title { display: block; font-weight: 600; text-decoration: none; margin-bottom: 0.2rem; }
+  .note :global(p:last-child) { margin-bottom: 0; }
+  .empty { padding: 2rem 0; }
+
+  @media (max-width: 560px) {
+    .entry { grid-template-columns: 1fr; }
+    .meta { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 0.6rem; padding-top: 0; }
+  }
+</style>
