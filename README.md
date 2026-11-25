@@ -52,7 +52,25 @@ section: gamedev
 正文。用 `##` 和 `###` 写小标题，会自动生成左侧的动态目录。
 ```
 
-`templates/` 文件夹里有两个可以直接复制的模板。
+### 模板
+
+`templates/` 里给每个栏目都准备了笔记和文章模板，复制一份改内容就行：
+
+| 栏目 | 笔记模板 | 文章模板 |
+| --- | --- | --- |
+| 课程学习 | `templates/notes/course.md` | `templates/articles/course.md` |
+| 游戏开发 | `templates/notes/gamedev.md` | `templates/articles/gamedev.md` |
+| 今日见闻 | `templates/notes/daily.md` | `templates/articles/daily.md` |
+| 杂想 | `templates/notes/misc.md` | `templates/articles/misc.md` |
+
+步骤：
+
+1. 复制模板到 `src/content/notes/`（笔记）或 `src/content/articles/`（文章）。
+2. 改文件名为「日期-英文短名.md」，比如 `2026-11-26-jump-feel.md`。
+3. 把正文换成你的内容。模板里 `#` 开头的说明行和 `<!-- -->` 里的提示都不会显示在网站上，留着也没关系。
+4. 提交（在 GitHub 网页上传，或者用 git 推送），一两分钟后网站自动更新。
+
+`templates/` 文件夹本身不会被发布到网站上。
 
 ### 在手机或网页上写
 
@@ -124,5 +142,5 @@ src/
   pages/about.md       “关于”页面
   styles/global.css    配色和字体（顶部的变量）
   layouts/ components/ pages/   页面模板，平时不用动
-templates/             新建记录的模板
+templates/             每个栏目的笔记 / 文章模板（不会被发布）
 ```
